@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings  #-}
 
 import Control.Applicative
+import Control.Monad
 import Data.String
 import qualified Data.ByteString.Char8 as BSChar
 import qualified Network.DNS as DNS
@@ -22,8 +23,8 @@ main = do
   let parent = tail $ dropWhile (/= '.') domain
   putStrLn $ "parent of this domain: "++parent
 
-  rs <- makeResolvSeed defaultResolvConf
-  parentNSes <- withResolver rs $ \resolver -> do
+  defaultrs <- makeResolvSeed defaultResolvConf
+  parentNSes <- withResolver defaultrs $ \resolver -> do
     DNS.lookup resolver (fromString parent) NS
   putStr "nameservers of parent: "
   print parentNSes
@@ -31,7 +32,7 @@ main = do
 
   putStrLn $ "Nameserver we will use: "++(BSChar.unpack aParentNS)
 
-  parentNS_As <- withResolver rs $ \resolver -> DNS.lookup resolver (aParentNS) A
+  parentNS_As <- withResolver defaultrs $ \resolver -> DNS.lookup resolver (aParentNS) A
 
   putStrLn $ "parent NS A RRset is "++(show parentNS_As)
 
@@ -43,7 +44,7 @@ main = do
   putStrLn $ "a parent NS A record is " ++(show a)
   let phn = RCHostName (show a)
   rs <- makeResolvSeed (ResolvConf phn 3000000 512)
-  hereNS <- withResolver rs $ \resolver -> DNS.lookup resolver (fromString domain) NS
+  (Just hereNS) <- withResolver rs $ \resolver -> DNS.lookup resolver (fromString domain) NS
   putStr "Name servers for this domain, according to parent: "
   print hereNS
 
@@ -58,6 +59,28 @@ main = do
   --   nameserver (which should be taken into account by the above mechanism
   --   without further action)
 
+  -- in the linear version, I need to explicitly map over all of the above
+  -- nameservers in hereNS
+
+  nsFromAllNS <- forM hereNS $ \ns -> do
+    putStrLn $ "Checking parent-supplied name server "++(show ns)
+    parentNS_As <- withResolver defaultrs $ \resolver -> DNS.lookup resolver (aParentNS) A
+    putStrLn $ "parent NS A RRset is "++(show parentNS_As)
+    let (RD_A a) = head $ maybeListToList parentNS_As
+    putStrLn $ "a parent NS A record is " ++(show a)
+
+    let phn = RCHostName (show a)
+    rs <- makeResolvSeed (ResolvConf phn 3000000 512)
+    (Just hereNS) <- withResolver rs $ \resolver -> DNS.lookup resolver (fromString domain) NS
+    putStr $ "Name servers for this domain, according to "++(show ns)++": "
+    print hereNS
+    --  ask that resolver to find the NS records for our domain
+    --    (which is the same query that we did before - this is where I want
+    --      looping to happen eventually)
+    --  and return that RRset
+    return $ hereNS
+
+  putStrLn $ "nsFromAllNS = "++(show nsFromAllNS)
 
   -- get a parent zone server. assume that the local recursive resolver
   -- is going to give us truthful values for this - we assume there is no
