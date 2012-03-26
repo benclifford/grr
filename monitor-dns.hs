@@ -11,6 +11,7 @@ import qualified Data.ByteString.Char8 as BSChar
 import qualified Network.DNS as DNS
 import Network.DNS hiding (lookup)
 import System.Environment
+import System.IO
 
 
 maybeListToList :: Maybe [a] -> [a]
@@ -18,36 +19,36 @@ maybeListToList (Nothing) = []
 maybeListToList (Just l) = l
 
 main = do
-  putStrLn "monitor-dns"
+  debugline "monitor-dns"
   domain <- head <$> getArgs
-  putStrLn $ "domain to check: "++domain
+  debugline $ "domain to check: "++domain
   let parent = tail $ dropWhile (/= '.') domain
-  putStrLn $ "parent of this domain: "++parent
+  debugline $ "parent of this domain: "++parent
 
   defaultrs <- makeResolvSeed defaultResolvConf
   parentNSes <- withResolver defaultrs $ \resolver -> do
     DNS.lookup resolver (fromString parent) NS
-  putStr "nameservers of parent: "
-  print parentNSes
+  debugline "nameservers of parent: "
+  debugline $ show parentNSes
   let (RD_NS aParentNS) = head $ maybeListToList parentNSes
 
-  putStrLn $ "Nameserver we will use: "++(BSChar.unpack aParentNS)
+  debugline $ "Nameserver we will use: "++(BSChar.unpack aParentNS)
 
   parentNS_As <- withResolver defaultrs $ \resolver -> DNS.lookup resolver (aParentNS) A
 
-  putStrLn $ "parent NS A RRset is "++(show parentNS_As)
+  debugline $ "parent NS A RRset is "++(show parentNS_As)
 
   let (RD_A a) = head $ maybeListToList parentNS_As
 
   -- note, this will look up the IP(s) of parent NS outside of my controlled
   -- environment - perhaps later I should be doing the resolution of this
   -- to an IP address myself?
-  putStrLn $ "a parent NS A record is " ++(show a)
+  debugline $ "a parent NS A record is " ++(show a)
   let phn = RCHostName (show a)
   rs <- makeResolvSeed (ResolvConf phn 3000000 512)
   (Just hereNS) <- withResolver rs $ \resolver -> DNS.lookup resolver (fromString domain) NS
-  putStr "Name servers for this domain, according to parent: "
-  print hereNS
+  debugline "Name servers for this domain, according to parent: "
+  debugline $ show hereNS
 
   -- in a non-linear version of this, this is the main point I want to loop:
   --   name servers can come from multiple places: the delegation glue (which
@@ -64,17 +65,17 @@ main = do
   -- nameservers in hereNS
 
   nsFromAllNS <- forM hereNS $ \ns -> do
-    putStrLn $ "Checking parent-supplied name server "++(show ns)
+    debugline $ "Checking parent-supplied name server "++(show ns)
     parentNS_As <- withResolver defaultrs $ \resolver -> DNS.lookup resolver (aParentNS) A
-    putStrLn $ "parent NS A RRset is "++(show parentNS_As)
+    debugline $ "parent NS A RRset is "++(show parentNS_As)
     let (RD_A a) = head $ maybeListToList parentNS_As
-    putStrLn $ "a parent NS A record is " ++(show a)
+    debugline $ "a parent NS A record is " ++(show a)
 
     let phn = RCHostName (show a)
     rs <- makeResolvSeed (ResolvConf phn 3000000 512)
     (Just hereNS) <- withResolver rs $ \resolver -> DNS.lookup resolver (fromString domain) NS
-    putStr $ "Name servers for this domain, according to "++(show ns)++": "
-    print hereNS
+    debugline $ "Name servers for this domain, according to "++(show ns)++": "
+    debugline $ show hereNS
     --  ask that resolver to find the NS records for our domain
     --    (which is the same query that we did before - this is where I want
     --      looping to happen eventually)
@@ -82,15 +83,16 @@ main = do
     return $ hereNS
 
   let allNS = hereNS : nsFromAllNS
-  putStrLn $ "allNS = "++(show allNS)
+  debugline $ "allNS = "++(show allNS)
   -- stringify and sort:
   let sortedAllNS = map sort (map (map show) allNS)
-  putStrLn $ "sortedAllNS = "++(show sortedAllNS)
+  debugline $ "sortedAllNS = "++(show sortedAllNS)
   -- now are they all the same?
   let compared = testAllEqual sortedAllNS
 
-  putStrLn $ "All equal? " ++ (show compared)
+  debugline $ "All equal? " ++ (show compared)
 
+debugline = hPutStrLn stderr
 
 testAllEqual [] = True
 testAllEqual [a] = True
