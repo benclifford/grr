@@ -5,6 +5,7 @@
 
 import Control.Applicative
 import Control.Monad
+import Data.List
 import Data.String
 import qualified Data.ByteString.Char8 as BSChar
 import qualified Network.DNS as DNS
@@ -80,7 +81,20 @@ main = do
     --  and return that RRset
     return $ hereNS
 
-  putStrLn $ "nsFromAllNS = "++(show nsFromAllNS)
+  let allNS = hereNS : nsFromAllNS
+  putStrLn $ "allNS = "++(show allNS)
+  -- stringify and sort:
+  let sortedAllNS = map sort (map (map show) allNS)
+  putStrLn $ "sortedAllNS = "++(show sortedAllNS)
+  -- now are they all the same?
+  let compared = testAllEqual sortedAllNS
+
+  putStrLn $ "All equal? " ++ (show compared)
+
+
+testAllEqual [] = True
+testAllEqual [a] = True
+testAllEqual (a:b:rest) = (a == b) && (testAllEqual (b:rest))
 
   -- get a parent zone server. assume that the local recursive resolver
   -- is going to give us truthful values for this - we assume there is no
