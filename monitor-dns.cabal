@@ -1,0 +1,12 @@
+Name: monitor-dns
+Version: 0.1
+Description: DNS health check
+License: AllRightsReserved
+Author: Ben Clifford <benc@cqx.ltd.uk>
+Build-Type: Simple
+Cabal-Version: >=1.6
+
+Executable monitor-dns
+  Build-depends: base, dns, bytestring
+  main-is: monitor-dns.hs
+

@@ -1,9 +1,84 @@
 -- (C)Copyright 2012 CQX Limited
 -- Not licensed for distribution
 
+{-# LANGUAGE OverloadedStrings  #-}
 
--- ok forget the original plan for now.
--- what I want to do is query the 
+import Control.Applicative
+import Data.String
+import qualified Data.ByteString.Char8 as BSChar
+import qualified Network.DNS as DNS
+import Network.DNS hiding (lookup)
+import System.Environment
+
+
+maybeListToList :: Maybe [a] -> [a]
+maybeListToList (Nothing) = []
+maybeListToList (Just l) = l
+
+main = do
+  putStrLn "monitor-dns"
+  domain <- head <$> getArgs
+  putStrLn $ "domain to check: "++domain
+  let parent = tail $ dropWhile (/= '.') domain
+  putStrLn $ "parent of this domain: "++parent
+
+  rs <- makeResolvSeed defaultResolvConf
+  parentNSes <- withResolver rs $ \resolver -> do
+    DNS.lookup resolver (fromString parent) NS
+  putStr "nameservers of parent: "
+  print parentNSes
+  let (RD_NS aParentNS) = head $ maybeListToList parentNSes
+
+  putStrLn $ "Nameserver we will use: "++(BSChar.unpack aParentNS)
+
+  parentNS_As <- withResolver rs $ \resolver -> DNS.lookup resolver (aParentNS) A
+
+  putStrLn $ "parent NS A RRset is "++(show parentNS_As)
+
+  let (RD_A a) = head $ maybeListToList parentNS_As
+
+  -- note, this will look up the IP(s) of parent NS outside of my controlled
+  -- environment - perhaps later I should be doing the resolution of this
+  -- to an IP address myself?
+  putStrLn $ "a parent NS A record is " ++(show a)
+  let phn = RCHostName (show a)
+  rs <- makeResolvSeed (ResolvConf phn 3000000 512)
+  hereNS <- withResolver rs $ \resolver -> DNS.lookup resolver (fromString domain) NS
+  putStr "Name servers for this domain, according to parent: "
+  print hereNS
+
+  -- in a non-linear version of this, this is the main point I want to loop:
+  --   name servers can come from multiple places: the delegation glue (which
+  --   the above gets) but also from all of these name servers.
+  -- When I become aware of a new nameserver for a zone, I need to re-run
+  --   any queries against that zone (that means anything below that, because
+  --   a zone cut is a non-deterministic thing in this model so I need to
+  --   discover those per-server)
+  -- That includes the query for the nameserver records themselves off each
+  --   nameserver (which should be taken into account by the above mechanism
+  --   without further action)
+
+
+  -- get a parent zone server. assume that the local recursive resolver
+  -- is going to give us truthful values for this - we assume there is no
+  -- misconfiguration there. later on, an --abusive mode might :w
+
+  -- MVP: get NS delegations from a single .com server
+  --      using arbitrary IP address lookup (I should be more careful about this - there's a big product space) on the NS records, perform a non-recursive SOA lookup on each name server, and check that we get back an SOA.
+
+  -- perform arbitrary DNS lookup to get a .COM nameserver
+  -- pick an arbitrary nameserver from this list.
+  -- query it non-RR for domain NS records.
+  -- for each NS record:
+  --   perform an arbitrary lookup on that NS hostname to give IP
+  --   query that IP non-RR for 'domain' SOA
+
+-- i wonder if there's a fairly generic model of how later results can
+--    add possible answers to queries that were made ealier and so I need
+--    to branch those again (because DNS queries i make later can return
+--    cached information such that if I made those queries again, I'd end
+--    up using that cached information, which adds another branch to the
+--    tree)... this feels really mfixy to me?
 
 
 -- this should check various things based around DNS.
