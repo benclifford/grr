@@ -86,7 +86,8 @@ main = do
 
   nsFromAllNS <- forM hereNS $ \ns -> do
     debugline $ "Checking parent-supplied name server "++(show ns)
-    parentNS_As <- withResolver defaultrs $ \resolver -> DNS.lookup resolver (aParentNS) A
+    parentNS_As <- withResolver defaultrs $ \resolver -> DNS.lookup resolver (fromString (show ns)) A
+    -- ^^ ICK - don't go via String
     debugline $ "parent NS A RRset is "++(show parentNS_As)
     let (RD_A a) = head $ maybeListToList parentNS_As
     debugline $ "a parent NS A record is " ++(show a)
