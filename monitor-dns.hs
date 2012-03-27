@@ -53,8 +53,12 @@ main = do
 -- parent server is also authoritative for this zone)
   debugline $ "maybeHereNSresult = " ++ (show maybeHereNSresult)
   let (Just (DNSFormat h q ans auth add)) = maybeHereNSresult
-  let rdatas = map (\rr -> rdata rr) ans
+  -- let rdatas = map (\rr -> rdata rr) ans
+  let rdatas = [rdata x | x <- ans]
+  let authrdatas = [rdata x | x <- auth, rrtype x == NS,
+                                         rrname x == fromString domain]
   debugline $ "rdatas = " ++ (show rdatas)
+  debugline $ "authrdatas = " ++ (show authrdatas)
   let hereNS = rdatas :: [RDATA] -- TODO need to add in authority NS records too if they exist
 
   debugline "Name servers for this domain, according to parent: "
