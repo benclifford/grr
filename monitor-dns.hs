@@ -56,10 +56,10 @@ main = do
   -- let rdatas = map (\rr -> rdata rr) ans
   let rdatas = [rdata x | x <- ans]
   let authrdatas = [rdata x | x <- auth, rrtype x == NS,
-                                         rrname x == fromString domain]
+                                         rrname x == fromString (domain++".")]
   debugline $ "rdatas = " ++ (show rdatas)
   debugline $ "authrdatas = " ++ (show authrdatas)
-  let hereNS = rdatas :: [RDATA] -- TODO need to add in authority NS records too if they exist
+  let hereNS = rdatas ++ authrdatas :: [RDATA] -- TODO need to add in authority NS records too if they exist
 
   debugline "Name servers for this domain, according to parent: "
 -- BUG: if we don't pick up any nameservers here, then we won't look at any
