@@ -96,7 +96,7 @@ main = do
   debugline $ "All equal? " ++ (show compared)
   if compared then do
     putStrLn "NS OK - all NS RRsets match"
-    exitWith (ExitFailure 0)
+    exitWith (ExitSuccess)
    else do
     putStrLn "NS WARNING - NS RRsets are not all the same"
     exitWith (ExitFailure 1)
