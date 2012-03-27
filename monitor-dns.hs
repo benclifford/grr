@@ -47,13 +47,15 @@ main = do
   debugline $ "a parent NS A record is " ++(show a)
   let phn = RCHostName (show a)
   rs <- makeResolvSeed (ResolvConf phn 3000000 512)
-  maybeHereNS <- withResolver rs $ \resolver -> DNS.lookupRaw resolver (fromString domain) NS
+  maybeHereNSresult <- withResolver rs $ \resolver -> DNS.lookupRaw resolver (fromString domain) NS
 -- TODO: the above needs to get authority records too, because I could be
 -- getting a delegation (or I could be getting authoritative data, if the
 -- parent server is also authoritative for this zone)
-  debugline $ "maybeHereNS = " ++ (show maybeHereNS)
-  let (Just (DNSFormat h q ans auth add)) = maybeHereNS
-  let (Just hereNS) = Nothing :: (Maybe [RDATA]) -- FLESH ME OUT based on the dns formats...
+  debugline $ "maybeHereNSresult = " ++ (show maybeHereNSresult)
+  let (Just (DNSFormat h q ans auth add)) = maybeHereNSresult
+  let rdatas = map (\rr -> rdata rr) ans
+  debugline $ "rdatas = " ++ (show rdatas)
+  let hereNS = rdatas :: [RDATA] -- TODO need to add in authority NS records too if they exist
   debugline "Name servers for this domain, according to parent: "
   debugline $ show hereNS
 
