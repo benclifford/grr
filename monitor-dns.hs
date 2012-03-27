@@ -94,7 +94,11 @@ main = do
 
     let phn = RCHostName (show a)
     rs <- makeResolvSeed (ResolvConf phn 3000000 512)
-    (Just hereNS) <- withResolver rs $ \resolver -> DNS.lookup resolver (fromString domain) NS
+    res <- withResolver rs $ \resolver -> DNS.lookup resolver (fromString domain) NS
+    let hereNS =
+         case res of
+          Just x -> x
+          Nothing -> []
     debugline $ "Name servers for this domain, according to "++(show ns)++": "
     debugline $ show hereNS
     --  ask that resolver to find the NS records for our domain
