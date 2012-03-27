@@ -56,7 +56,14 @@ main = do
   let rdatas = map (\rr -> rdata rr) ans
   debugline $ "rdatas = " ++ (show rdatas)
   let hereNS = rdatas :: [RDATA] -- TODO need to add in authority NS records too if they exist
+
   debugline "Name servers for this domain, according to parent: "
+-- BUG: if we don't pick up any nameservers here, then we won't look at any
+-- child nameservers, and we'll pass this test because we'll end up with
+-- a list [[]] where all the entries are equal to each other (and to []).
+-- Whilst strictly this test would accept that, its pretty much not what
+-- I expect this tool to do. So I should check there is at least one NS
+-- (or maybe two and give a warning if not at least two?)
   debugline $ show hereNS
 
   -- in a non-linear version of this, this is the main point I want to loop:
