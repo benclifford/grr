@@ -11,6 +11,7 @@ import qualified Data.ByteString.Char8 as BSChar
 import qualified Network.DNS as DNS
 import Network.DNS hiding (lookup)
 import System.Environment
+import System.Exit
 import System.IO
 
 
@@ -46,7 +47,9 @@ main = do
   debugline $ "a parent NS A record is " ++(show a)
   let phn = RCHostName (show a)
   rs <- makeResolvSeed (ResolvConf phn 3000000 512)
-  (Just hereNS) <- withResolver rs $ \resolver -> DNS.lookup resolver (fromString domain) NS
+  maybeHereNS <- withResolver rs $ \resolver -> DNS.lookup resolver (fromString domain) NS
+  debugline $ "maybeHereNS = " ++ (show maybeHereNS)
+  let (Just hereNS) = maybeHereNS
   debugline "Name servers for this domain, according to parent: "
   debugline $ show hereNS
 
@@ -91,6 +94,12 @@ main = do
   let compared = testAllEqual sortedAllNS
 
   debugline $ "All equal? " ++ (show compared)
+  if compared then do
+    putStrLn "NS OK - all NS RRsets match"
+    exitWith (ExitFailure 0)
+   else do
+    putStrLn "NS WARNING - NS RRsets are not all the same"
+    exitWith (ExitFailure 1)
 
 debugline = hPutStrLn stderr
 
