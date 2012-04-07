@@ -1,7 +1,7 @@
 -- (C)Copyright 2012 CQX Limited
 -- Not licensed for distribution
 
-{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE OverloadedStrings, ScopedTypeVariables  #-}
 
 import Control.Applicative
 import Control.Monad
@@ -25,18 +25,49 @@ maybeListToList (Just l) = l
 
 -- for now, its ok if we get multiple default resolvers or one
 -- they should behave similarly enough for what the code wants
--- right now.
+-- right now
 defaultrs = unsafePerformIO $ makeResolvSeed defaultResolvConf
 
-dnslookup res name rrtype = withResolver res $ \resolver ->
+data DNSLookup a = DNSLookup (IO a)
+
+instance Monad DNSLookup where
+  return a = DNSLookup (return a)
+  (DNSLookup v :: DNSLookup a) >>= (f :: a -> DNSLookup b) = DNSLookup $ do
+       r <- v
+       let (DNSLookup act) = f r
+       act
+
+-- bind just unwraps and rewraps at the moment - nothing fancy at all.
+
+-- operations that will be in our monad:
+dnslookup res name rrtype = DNSLookup $ withResolver res $ \resolver ->
                                    DNS.lookup resolver name rrtype
 
-dnslookupRaw res name rrtype = withResolver res $ \resolver ->
+dnslookupRaw res name rrtype = DNSLookup $ withResolver res $ \resolver ->
                                    DNS.lookupRaw resolver name rrtype
 
+-- this should merge with a function for looking up from a specifc
+-- server.
+dnsMakeSeed nsname = DNSLookup $ do
+  let phn = RCHostName (show nsname)
+  makeResolvSeed (ResolvConf phn 3000000 512)
+
+
+debugline s = DNSLookup $ hPutStrLn stderr s
+
+reportSuccess w = DNSLookup $ (putStrLn w >> exitWith (ExitSuccess))
+reportWarning w = DNSLookup $ (putStrLn w >> exitWith (ExitFailure 1))
+
+runLookup :: DNSLookup a -> IO a
+runLookup (DNSLookup action) = action
+
 main = do
-  debugline "monitor-dns"
-  domain <- head <$> getArgs
+  putStrLn "monitor-dns"
+  (domain :: String) <- head <$> (getArgs :: IO [String])
+  runLookup (go domain)
+
+go :: String -> DNSLookup ()
+go domain = do
   debugline $ "domain to check: "++domain
   let parent = tail $ dropWhile (/= '.') domain
   debugline $ "parent of this domain: "++parent
@@ -59,8 +90,8 @@ main = do
   -- environment - perhaps later I should be doing the resolution of this
   -- to an IP address myself?
   debugline $ "a parent NS A record is " ++(show a)
-  let phn = RCHostName (show a)
-  rs <- makeResolvSeed (ResolvConf phn 3000000 512)
+
+  rs <- dnsMakeSeed (show a)
 
 --  maybeHereNSresult <- withResolver rs $ \resolver -> DNS.lookupRaw resolver (fromString domain) NS
   maybeHereNSresult <- dnslookupRaw rs (fromString domain) NS
@@ -104,9 +135,7 @@ main = do
     debugline $ "parent NS A RRset is "++(show parentNS_As)
     let (RD_A a) = head $ maybeListToList parentNS_As
     debugline $ "a parent NS A record is " ++(show a)
-
-    let phn = RCHostName (show a)
-    rs <- makeResolvSeed (ResolvConf phn 3000000 512)
+    rs <- dnsMakeSeed (show a)
     res <- dnslookup rs (fromString domain) NS
     let hereNS =
          case res of
@@ -130,13 +159,10 @@ main = do
 
   debugline $ "All equal? " ++ (show compared)
   if compared then do
-    putStrLn "NS OK - all NS RRsets match"
-    exitWith (ExitSuccess)
+    reportSuccess "NS OK - all NS RRsets match"
    else do
-    putStrLn "NS WARNING - NS RRsets are not all the same"
-    exitWith (ExitFailure 1)
+    reportWarning "NS WARNING - NS RRsets are not all the same"
 
-debugline = hPutStrLn stderr
 
 testAllEqual [] = True
 testAllEqual [a] = True
