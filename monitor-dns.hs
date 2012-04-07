@@ -58,8 +58,8 @@ dnslookupRaw nsip name rrtype = DNSLookup $ do
 
 debugline s = DNSLookup $ hPutStrLn stderr s
 
-reportSuccess w = DNSLookup $ (putStrLn w >> exitWith (ExitSuccess))
-reportWarning w = DNSLookup $ (putStrLn w >> exitWith (ExitFailure 1))
+reportSuccess w = DNSLookup $ (putStrLn ("NS OK - " ++ w) >> exitWith (ExitSuccess))
+reportWarning w = DNSLookup $ (putStrLn ("NS WARNING - " ++ w) >> exitWith (ExitFailure 1))
 
 runLookup :: DNSLookup a -> IO a
 runLookup (DNSLookup action) = action
@@ -159,9 +159,9 @@ go domain = do
 
   debugline $ "All equal? " ++ (show compared)
   if compared then do
-    reportSuccess "NS OK - all NS RRsets match"
+    reportSuccess "all NS RRsets match"
    else do
-    reportWarning "NS WARNING - NS RRsets are not all the same"
+    reportWarning "NS RRsets are not all the same"
 
 
 testAllEqual [] = True
