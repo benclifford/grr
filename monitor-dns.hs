@@ -19,6 +19,12 @@ maybeListToList :: Maybe [a] -> [a]
 maybeListToList (Nothing) = []
 maybeListToList (Just l) = l
 
+dnslookup res name rrtype = withResolver res $ \resolver ->
+                                   DNS.lookup resolver name rrtype
+
+dnslookupRaw res name rrtype = withResolver res $ \resolver ->
+                                   DNS.lookupRaw resolver name rrtype
+
 main = do
   debugline "monitor-dns"
   domain <- head <$> getArgs
@@ -27,15 +33,16 @@ main = do
   debugline $ "parent of this domain: "++parent
 
   defaultrs <- makeResolvSeed defaultResolvConf
-  parentNSes <- withResolver defaultrs $ \resolver -> do
-    DNS.lookup resolver (fromString parent) NS
+
+  parentNSes <- dnslookup defaultrs (fromString parent) NS
+
   debugline "nameservers of parent: "
   debugline $ show parentNSes
   let (RD_NS aParentNS) = head $ maybeListToList parentNSes
 
   debugline $ "Nameserver we will use: "++(BSChar.unpack aParentNS)
 
-  parentNS_As <- withResolver defaultrs $ \resolver -> DNS.lookup resolver (aParentNS) A
+  parentNS_As <- dnslookup defaultrs aParentNS A
 
   debugline $ "parent NS A RRset is "++(show parentNS_As)
 
@@ -47,19 +54,18 @@ main = do
   debugline $ "a parent NS A record is " ++(show a)
   let phn = RCHostName (show a)
   rs <- makeResolvSeed (ResolvConf phn 3000000 512)
-  maybeHereNSresult <- withResolver rs $ \resolver -> DNS.lookupRaw resolver (fromString domain) NS
--- TODO: the above needs to get authority records too, because I could be
--- getting a delegation (or I could be getting authoritative data, if the
--- parent server is also authoritative for this zone)
+
+--  maybeHereNSresult <- withResolver rs $ \resolver -> DNS.lookupRaw resolver (fromString domain) NS
+  maybeHereNSresult <- dnslookupRaw rs (fromString domain) NS
+
   debugline $ "maybeHereNSresult = " ++ (show maybeHereNSresult)
   let (Just (DNSFormat h q ans auth add)) = maybeHereNSresult
-  -- let rdatas = map (\rr -> rdata rr) ans
   let rdatas = [rdata x | x <- ans]
   let authrdatas = [rdata x | x <- auth, rrtype x == NS,
                                          rrname x == fromString (domain++".")]
   debugline $ "rdatas = " ++ (show rdatas)
   debugline $ "authrdatas = " ++ (show authrdatas)
-  let hereNS = rdatas ++ authrdatas :: [RDATA] -- TODO need to add in authority NS records too if they exist
+  let hereNS = rdatas ++ authrdatas :: [RDATA]
 
   debugline "Name servers for this domain, according to parent: "
 -- BUG: if we don't pick up any nameservers here, then we won't look at any
@@ -86,7 +92,7 @@ main = do
 
   nsFromAllNS <- forM hereNS $ \ns -> do
     debugline $ "Checking parent-supplied name server "++(show ns)
-    parentNS_As <- withResolver defaultrs $ \resolver -> DNS.lookup resolver (fromString (show ns)) A
+    parentNS_As <- dnslookup defaultrs (fromString $ show ns) A
     -- ^^ ICK - don't go via String
     debugline $ "parent NS A RRset is "++(show parentNS_As)
     let (RD_A a) = head $ maybeListToList parentNS_As
@@ -94,7 +100,7 @@ main = do
 
     let phn = RCHostName (show a)
     rs <- makeResolvSeed (ResolvConf phn 3000000 512)
-    res <- withResolver rs $ \resolver -> DNS.lookup resolver (fromString domain) NS
+    res <- dnslookup rs (fromString domain) NS
     let hereNS =
          case res of
           Just x -> x
