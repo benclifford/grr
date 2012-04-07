@@ -14,10 +14,19 @@ import System.Environment
 import System.Exit
 import System.IO
 
+import System.IO.Unsafe
+-- unsafe is to get global resolver - this could feed into the state of a
+-- resolver monad, though? (which should also be listy to give us tree-like
+-- behaviour?)
 
 maybeListToList :: Maybe [a] -> [a]
 maybeListToList (Nothing) = []
 maybeListToList (Just l) = l
+
+-- for now, its ok if we get multiple default resolvers or one
+-- they should behave similarly enough for what the code wants
+-- right now.
+defaultrs = unsafePerformIO $ makeResolvSeed defaultResolvConf
 
 dnslookup res name rrtype = withResolver res $ \resolver ->
                                    DNS.lookup resolver name rrtype
@@ -31,8 +40,6 @@ main = do
   debugline $ "domain to check: "++domain
   let parent = tail $ dropWhile (/= '.') domain
   debugline $ "parent of this domain: "++parent
-
-  defaultrs <- makeResolvSeed defaultResolvConf
 
   parentNSes <- dnslookup defaultrs (fromString parent) NS
 
