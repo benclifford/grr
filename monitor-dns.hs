@@ -40,18 +40,21 @@ instance Monad DNSLookup where
 -- bind just unwraps and rewraps at the moment - nothing fancy at all.
 
 -- operations that will be in our monad:
-dnslookup res name rrtype = DNSLookup $ withResolver res $ \resolver ->
-                                   DNS.lookup resolver name rrtype
 
-dnslookupRaw res name rrtype = DNSLookup $ withResolver res $ \resolver ->
-                                   DNS.lookupRaw resolver name rrtype
+-- this means to apply the whole DNS lookup algorithm:
+dnslookupDefault name rrtype = DNSLookup $ withResolver defaultrs $ \resolver ->
+                                 DNS.lookup resolver name rrtype
 
--- this should merge with a function for looking up from a specifc
--- server.
-dnsMakeSeed nsname = DNSLookup $ do
-  let phn = RCHostName (show nsname)
-  makeResolvSeed (ResolvConf phn 3000000 512)
+-- these two mean to query only a specific DNS server for a value
+dnslookup nsip name rrtype = DNSLookup $ do
+  let phn = RCHostName (show nsip)
+  res <- makeResolvSeed (ResolvConf phn 3000000 512)
+  withResolver res $ \resolver -> DNS.lookup resolver name rrtype
 
+dnslookupRaw nsip name rrtype = DNSLookup $ do
+  let phn = RCHostName (show nsip)
+  res <- makeResolvSeed (ResolvConf phn 3000000 512)
+  withResolver res $ \resolver -> DNS.lookupRaw resolver name rrtype
 
 debugline s = DNSLookup $ hPutStrLn stderr s
 
@@ -72,7 +75,7 @@ go domain = do
   let parent = tail $ dropWhile (/= '.') domain
   debugline $ "parent of this domain: "++parent
 
-  parentNSes <- dnslookup defaultrs (fromString parent) NS
+  parentNSes <- dnslookupDefault (fromString parent) NS
 
   debugline "nameservers of parent: "
   debugline $ show parentNSes
@@ -80,7 +83,7 @@ go domain = do
 
   debugline $ "Nameserver we will use: "++(BSChar.unpack aParentNS)
 
-  parentNS_As <- dnslookup defaultrs aParentNS A
+  parentNS_As <- dnslookupDefault aParentNS A
 
   debugline $ "parent NS A RRset is "++(show parentNS_As)
 
@@ -91,13 +94,11 @@ go domain = do
   -- to an IP address myself?
   debugline $ "a parent NS A record is " ++(show a)
 
-  rs <- dnsMakeSeed (show a)
-
---  maybeHereNSresult <- withResolver rs $ \resolver -> DNS.lookupRaw resolver (fromString domain) NS
-  maybeHereNSresult <- dnslookupRaw rs (fromString domain) NS
+  maybeHereNSresult <- dnslookupRaw a (fromString domain) NS
 
   debugline $ "maybeHereNSresult = " ++ (show maybeHereNSresult)
   let (Just (DNSFormat h q ans auth add)) = maybeHereNSresult
+
   let rdatas = [rdata x | x <- ans]
   let authrdatas = [rdata x | x <- auth, rrtype x == NS,
                                          rrname x == fromString (domain++".")]
@@ -130,13 +131,12 @@ go domain = do
 
   nsFromAllNS <- forM hereNS $ \ns -> do
     debugline $ "Checking parent-supplied name server "++(show ns)
-    parentNS_As <- dnslookup defaultrs (fromString $ show ns) A
+    parentNS_As <- dnslookupDefault (fromString $ show ns) A
     -- ^^ ICK - don't go via String
     debugline $ "parent NS A RRset is "++(show parentNS_As)
     let (RD_A a) = head $ maybeListToList parentNS_As
     debugline $ "a parent NS A record is " ++(show a)
-    rs <- dnsMakeSeed (show a)
-    res <- dnslookup rs (fromString domain) NS
+    res <- dnslookup a (fromString domain) NS
     let hereNS =
          case res of
           Just x -> x
