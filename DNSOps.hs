@@ -4,6 +4,7 @@
 
 module DNSOps where
 
+  import Control.Applicative
   import qualified Network.DNS as DNS
   import Network.DNS hiding (lookup)
   import System.IO
@@ -20,8 +21,12 @@ module DNSOps where
        let (DNSLookup act) = f r
        act
 
-  dnslookupDefault name rrtype = DNSLookup $ withResolver defaultrs $
-    \resolver -> DNS.lookup resolver name rrtype
+  instance Functor DNSLookup where
+    fmap (f :: u -> v)  (a :: DNSLookup u) = do
+      x <- a
+      return (f x)
+
+  dnslookupDefault name rrtype = maybeListToList <$> (DNSLookup $ withResolver defaultrs $ \resolver -> DNS.lookup resolver name rrtype)
 
 -- these two mean to query only a specific DNS server for a value
   dnslookup nsip name rrtype = DNSLookup $ do
@@ -38,4 +43,8 @@ module DNSOps where
 
   runLookup :: DNSLookup a -> IO a
   runLookup (DNSLookup action) = action
+
+  maybeListToList :: Maybe [a] -> [a]
+  maybeListToList (Nothing) = []
+  maybeListToList (Just l) = l
 

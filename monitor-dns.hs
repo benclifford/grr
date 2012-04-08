@@ -17,10 +17,6 @@ import NagiosHaskell
 
 import DNSOps
 
-maybeListToList :: Maybe [a] -> [a]
-maybeListToList (Nothing) = []
-maybeListToList (Just l) = l
-
 testAllEqual [] = True
 testAllEqual [a] = True
 testAllEqual (a:b:rest) = (a == b) && (testAllEqual (b:rest))
@@ -58,7 +54,7 @@ go domain = do
 
   debugline "nameservers of parent: "
   debugline $ show parentNSes
-  let (RD_NS aParentNS) = head $ maybeListToList parentNSes
+  let (RD_NS aParentNS) = head $ parentNSes
 
   debugline $ "Nameserver we will use: "++(BSChar.unpack aParentNS)
 
@@ -66,7 +62,7 @@ go domain = do
 
   debugline $ "parent NS A RRset is "++(show parentNS_As)
 
-  let (RD_A a) = head $ maybeListToList parentNS_As
+  let (RD_A a) = head $ parentNS_As
 
   -- note, this will look up the IP(s) of parent NS outside of my controlled
   -- environment - perhaps later I should be doing the resolution of this
@@ -113,7 +109,7 @@ go domain = do
     parentNS_As <- dnslookupDefault (fromString $ show ns) A
     -- ^^ ICK - don't go via String
     debugline $ "parent NS A RRset is "++(show parentNS_As)
-    let (RD_A a) = head $ maybeListToList parentNS_As
+    let (RD_A a) = head $ parentNS_As
     debugline $ "a parent NS A record is " ++(show a)
     res <- dnslookup a (fromString domain) NS
     let hereNS =
