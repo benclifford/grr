@@ -11,65 +11,44 @@ import qualified Data.ByteString.Char8 as BSChar
 import qualified Network.DNS as DNS
 import Network.DNS hiding (lookup)
 import System.Environment
-import System.Exit
 import System.IO
 
-import System.IO.Unsafe
--- unsafe is to get global resolver - this could feed into the state of a
--- resolver monad, though? (which should also be listy to give us tree-like
--- behaviour?)
+import NagiosHaskell
+
+import DNSOps
 
 maybeListToList :: Maybe [a] -> [a]
 maybeListToList (Nothing) = []
 maybeListToList (Just l) = l
 
--- for now, its ok if we get multiple default resolvers or one
--- they should behave similarly enough for what the code wants
--- right now
-defaultrs = unsafePerformIO $ makeResolvSeed defaultResolvConf
+testAllEqual [] = True
+testAllEqual [a] = True
+testAllEqual (a:b:rest) = (a == b) && (testAllEqual (b:rest))
 
-data DNSLookup a = DNSLookup (IO a)
-
-instance Monad DNSLookup where
-  return a = DNSLookup (return a)
-  (DNSLookup v :: DNSLookup a) >>= (f :: a -> DNSLookup b) = DNSLookup $ do
-       r <- v
-       let (DNSLookup act) = f r
-       act
-
--- bind just unwraps and rewraps at the moment - nothing fancy at all.
-
--- operations that will be in our monad:
-
--- this means to apply the whole DNS lookup algorithm:
-dnslookupDefault name rrtype = DNSLookup $ withResolver defaultrs $ \resolver ->
-                                 DNS.lookup resolver name rrtype
-
--- these two mean to query only a specific DNS server for a value
-dnslookup nsip name rrtype = DNSLookup $ do
-  let phn = RCHostName (show nsip)
-  res <- makeResolvSeed (ResolvConf phn 3000000 512)
-  withResolver res $ \resolver -> DNS.lookup resolver name rrtype
-
-dnslookupRaw nsip name rrtype = DNSLookup $ do
-  let phn = RCHostName (show nsip)
-  res <- makeResolvSeed (ResolvConf phn 3000000 512)
-  withResolver res $ \resolver -> DNS.lookupRaw resolver name rrtype
-
-debugline s = DNSLookup $ hPutStrLn stderr s
-
-reportSuccess w = DNSLookup $ (putStrLn ("NS OK - " ++ w) >> exitWith (ExitSuccess))
-reportWarning w = DNSLookup $ (putStrLn ("NS WARNING - " ++ w) >> exitWith (ExitFailure 1))
-
-runLookup :: DNSLookup a -> IO a
-runLookup (DNSLookup action) = action
+{-
+reportSuccess w = (putStrLn ("NS OK - " ++ w) >> exitWith (ExitSuccess))
+reportWarning w = (putStrLn ("NS WARNING - " ++ w) >> exitWith (ExitFailure 1))
+-}
+reportSuccess w = reportNagios (NagiosReport "NS" NagiosOK w)
+reportWarning w = reportNagios (NagiosReport "NS" NagiosWarning w)
 
 main = do
   putStrLn "monitor-dns"
   (domain :: String) <- head <$> (getArgs :: IO [String])
-  runLookup (go domain)
+  sortedAllNS <- runLookup (go domain)
 
-go :: String -> DNSLookup ()
+  putStrLn $ "sortedAllNS = "++(show sortedAllNS)
+  -- now are they all the same?
+  let compared = testAllEqual sortedAllNS
+
+  putStrLn $ "All equal? " ++ (show compared)
+  if compared then do
+    reportSuccess "all NS RRsets match"
+   else do
+    reportWarning "NS RRsets are not all the same"
+
+
+go :: String -> DNSLookup [[String]]
 go domain = do
   debugline $ "domain to check: "++domain
   let parent = tail $ dropWhile (/= '.') domain
@@ -153,20 +132,10 @@ go domain = do
   debugline $ "allNS = "++(show allNS)
   -- stringify and sort:
   let sortedAllNS = map sort (map (map show) allNS)
-  debugline $ "sortedAllNS = "++(show sortedAllNS)
-  -- now are they all the same?
-  let compared = testAllEqual sortedAllNS
 
-  debugline $ "All equal? " ++ (show compared)
-  if compared then do
-    reportSuccess "all NS RRsets match"
-   else do
-    reportWarning "NS RRsets are not all the same"
+  return sortedAllNS
 
 
-testAllEqual [] = True
-testAllEqual [a] = True
-testAllEqual (a:b:rest) = (a == b) && (testAllEqual (b:rest))
 
   -- get a parent zone server. assume that the local recursive resolver
   -- is going to give us truthful values for this - we assume there is no

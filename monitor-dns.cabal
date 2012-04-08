@@ -7,6 +7,6 @@ Build-Type: Simple
 Cabal-Version: >=1.6
 
 Executable monitor-dns
-  Build-depends: base, dns, bytestring
+  Build-depends: base, dns, bytestring, nagios-haskell
   main-is: monitor-dns.hs
 
