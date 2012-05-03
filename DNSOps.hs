@@ -31,7 +31,7 @@ module DNSOps where
 -- At present, it only asks the default resolver, but what I want
 -- eventually is a full DNS lookup with branching and loop-back to happen.
 
-  dnslookupDefault name rrtype = maybeListToList <$> (DNSLookup $ withResolver defaultrs $ \resolver -> DNS.lookup resolver name rrtype)
+  queryDNS name rrtype = maybeListToList <$> (DNSLookup $ withResolver defaultrs $ \resolver -> DNS.lookup resolver name rrtype)
 
 -- these two mean to query only a specific DNS server for a value.
 -- whatever they do with the output, they need to perform appropriate

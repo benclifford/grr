@@ -46,7 +46,7 @@ go domain = do
   let parent = tail $ dropWhile (/= '.') domain
   debugline $ "parent of this domain: "++parent
 
-  parentNSes <- dnslookupDefault (fromString parent) NS
+  parentNSes <- queryDNS (fromString parent) NS
 
   debugline "nameservers of parent: "
   debugline $ show parentNSes
@@ -54,7 +54,7 @@ go domain = do
 
   debugline $ "Nameserver we will use: "++(BSChar.unpack aParentNS)
 
-  parentNS_As <- dnslookupDefault aParentNS A
+  parentNS_As <- queryDNS aParentNS A
 
   debugline $ "parent NS A RRset is "++(show parentNS_As)
 
@@ -102,7 +102,7 @@ go domain = do
 
   nsFromAllNS <- forM hereNS $ \ns -> do
     debugline $ "Checking parent-supplied name server "++(show ns)
-    parentNS_As <- dnslookupDefault (fromString $ show ns) A
+    parentNS_As <- queryDNS (fromString $ show ns) A
     -- ^^ ICK - don't go via String
     debugline $ "parent NS A RRset is "++(show parentNS_As)
     let (RD_A a) = head $ parentNS_As
