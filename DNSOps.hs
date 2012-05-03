@@ -12,13 +12,13 @@ module DNSOps where
 
   defaultrs = unsafePerformIO $ makeResolvSeed defaultResolvConf
 
-  data DNSLookup a = DNSLookup (IO a)
+  data DNSLookup a = DNSLookupUnsafeIOAction (IO a)
 
   instance Monad DNSLookup where
-    return a = DNSLookup (return a)
-    (DNSLookup v :: DNSLookup a) >>= (f :: a -> DNSLookup b) = DNSLookup $ do
+    return a = DNSLookupUnsafeIOAction (return a)
+    (DNSLookupUnsafeIOAction v :: DNSLookup a) >>= (f :: a -> DNSLookup b) = DNSLookupUnsafeIOAction $ do
        r <- v
-       let (DNSLookup act) = f r
+       let (DNSLookupUnsafeIOAction act) = f r
        act
 
   instance Functor DNSLookup where
@@ -31,7 +31,7 @@ module DNSOps where
 -- At present, it only asks the default resolver, but what I want
 -- eventually is a full DNS lookup with branching and loop-back to happen.
 
-  queryDNS name rrtype = maybeListToList <$> (DNSLookup $ withResolver defaultrs $ \resolver -> DNS.lookup resolver name rrtype)
+  queryDNS name rrtype = maybeListToList <$> (DNSLookupUnsafeIOAction $ withResolver defaultrs $ \resolver -> DNS.lookup resolver name rrtype)
 
 -- these two mean to query only a specific DNS server for a value.
 -- whatever they do with the output, they need to perform appropriate
@@ -39,7 +39,7 @@ module DNSOps where
 -- they are lower level than queryDNS - they are directed at a
 -- specific server and won't go off chasing referals.
 
-  queryServerRaw nsip name rrtype = DNSLookup $ do
+  queryServerRaw nsip name rrtype = DNSLookupUnsafeIOAction $ do
     let phn = RCHostName (show nsip)
     res <- makeResolvSeed (ResolvConf phn 3000000 512)
     withResolver res $ \resolver -> DNS.lookupRaw resolver name rrtype
@@ -53,10 +53,10 @@ module DNSOps where
       Nothing -> return Nothing
       Just (DNSFormat _ _ answers _ _) -> return $ Just $ map (\(ResourceRecord _ _ _ _ r) -> r) answers
 
-  debugline s = DNSLookup $ hPutStrLn stderr s
+  debugline s = DNSLookupUnsafeIOAction $ hPutStrLn stderr s
 
   runLookup :: DNSLookup a -> IO a
-  runLookup (DNSLookup action) = action
+  runLookup (DNSLookupUnsafeIOAction action) = action
 
   maybeListToList :: Maybe [a] -> [a]
   maybeListToList (Nothing) = []
