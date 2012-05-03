@@ -1,12 +1,12 @@
-Name: monitor-dns
+Name: dnsloops
 Version: 0.3
-Description: DNS health check
+Description: DNS lookup with feedback of newly found results
 License: AllRightsReserved
 Author: Ben Clifford <benc@cqx.ltd.uk>
 Build-Type: Simple
 Cabal-Version: >=1.6
 
-Executable monitor-dns
+Executable dnsloops
   Build-depends: base, dns, bytestring, nagios-haskell
   main-is: monitor-dns.hs
 
