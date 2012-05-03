@@ -44,7 +44,7 @@ module DNSOps where
     res <- makeResolvSeed (ResolvConf phn 3000000 512)
     withResolver res $ \resolver -> DNS.lookup resolver name rrtype
 
-  dnslookupRaw nsip name rrtype = DNSLookup $ do
+  queryServer nsip name rrtype = DNSLookup $ do
     let phn = RCHostName (show nsip)
     res <- makeResolvSeed (ResolvConf phn 3000000 512)
     withResolver res $ \resolver -> DNS.lookupRaw resolver name rrtype

@@ -65,7 +65,7 @@ go domain = do
   -- to an IP address myself?
   debugline $ "a parent NS A record is " ++(show a)
 
-  maybeHereNSresult <- dnslookupRaw a (fromString domain) NS
+  maybeHereNSresult <- queryServer a (fromString domain) NS
 
   debugline $ "maybeHereNSresult = " ++ (show maybeHereNSresult)
   let (Just (DNSFormat h q ans auth add)) = maybeHereNSresult
