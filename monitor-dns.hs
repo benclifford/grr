@@ -46,19 +46,11 @@ go domain = do
   let parent = tail $ dropWhile (/= '.') domain
   debugline $ "parent of this domain: "++parent
 
-  parentNSes <- queryDNS (fromString parent) NS
-
-  debugline "nameservers of parent: "
-  debugline $ show parentNSes
-  let (RD_NS aParentNS) = head $ parentNSes
+  (RD_NS aParentNS) <- queryDNSForSingleRR (fromString parent) NS
 
   debugline $ "Nameserver we will use: "++(BSChar.unpack aParentNS)
 
-  parentNS_As <- queryDNS aParentNS A
-
-  debugline $ "parent NS A RRset is "++(show parentNS_As)
-
-  let (RD_A a) = head $ parentNS_As
+  (RD_A a) <- queryDNSForSingleRR aParentNS A
 
   -- note, this will look up the IP(s) of parent NS outside of my controlled
   -- environment - perhaps later I should be doing the resolution of this
@@ -102,10 +94,8 @@ go domain = do
 
   nsFromAllNS <- forM hereNS $ \ns -> do
     debugline $ "Checking parent-supplied name server "++(show ns)
-    parentNS_As <- queryDNS (fromString $ show ns) A
+    (RD_A a) <- queryDNSForSingleRR (fromString $ show ns) A
     -- ^^ ICK - don't go via String
-    debugline $ "parent NS A RRset is "++(show parentNS_As)
-    let (RD_A a) = head $ parentNS_As
     debugline $ "a parent NS A record is " ++(show a)
     res <- queryServer a (fromString domain) NS
     let hereNS =

@@ -12,6 +12,17 @@ module DNSOps where
 
   defaultrs = unsafePerformIO $ makeResolvSeed defaultResolvConf
 
+-- DNSLookup is a monad in which DNS lookups can be performed.
+-- For now, it is a straightforward wrapper around IO.
+
+-- What I want to do is:
+--   i) non-determinism - probably using ListT
+--      non-determinism might happen in a few places. At present, a query
+--      returns an RRset. But I'd like a non-deterministic query that returns
+--      a single RR.
+--  ii) caching with state - StateT?
+-- iii) loopback of cache updates - this is a bit novel
+
   data DNSLookup a = DNSLookupUnsafeIOAction (IO a)
 
   instance Monad DNSLookup where
@@ -32,6 +43,14 @@ module DNSOps where
 -- eventually is a full DNS lookup with branching and loop-back to happen.
 
   queryDNS name rrtype = maybeListToList <$> (DNSLookupUnsafeIOAction $ withResolver defaultrs $ \resolver -> DNS.lookup resolver name rrtype)
+
+  -- this returns a single RR from the queried RRset
+  -- at the moment, it will fail with a pattern match failure when the
+  -- RRset is empty. later on, this should turn into non-deterministic
+  -- list-monad-like behaviour.
+  queryDNSForSingleRR name rrtype = do
+    r <- queryDNS name rrtype
+    return $ head r
 
 -- these two mean to query only a specific DNS server for a value.
 -- whatever they do with the output, they need to perform appropriate
