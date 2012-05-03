@@ -21,10 +21,6 @@ testAllEqual [] = True
 testAllEqual [a] = True
 testAllEqual (a:b:rest) = (a == b) && (testAllEqual (b:rest))
 
-{-
-reportSuccess w = (putStrLn ("NS OK - " ++ w) >> exitWith (ExitSuccess))
-reportWarning w = (putStrLn ("NS WARNING - " ++ w) >> exitWith (ExitFailure 1))
--}
 reportSuccess w = reportNagios (NagiosReport "NS" NagiosOK w)
 reportWarning w = reportNagios (NagiosReport "NS" NagiosWarning w)
 
