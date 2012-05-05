@@ -5,6 +5,8 @@
 module DNSOps where
 
   import Control.Applicative
+  import Control.Monad.List
+  import Control.Monad.Trans
   import qualified Network.DNS as DNS
   import Network.DNS hiding (lookup)
   import System.IO
@@ -23,17 +25,20 @@ module DNSOps where
 --  ii) caching with state - StateT?
 -- iii) loopback of cache updates - this is a bit novel
 
-  data DNSLookup a = DNSLookupUnsafeIOAction (IO a)
+  type DNSLookup a = ListT BaseDNSMonad a
 
-  instance Monad DNSLookup where
+  data BaseDNSMonad a = DNSLookupUnsafeIOAction (IO a)
+
+
+  instance Monad BaseDNSMonad where
     return a = DNSLookupUnsafeIOAction (return a)
-    (DNSLookupUnsafeIOAction v :: DNSLookup a) >>= (f :: a -> DNSLookup b) = DNSLookupUnsafeIOAction $ do
+    (DNSLookupUnsafeIOAction v :: BaseDNSMonad a) >>= (f :: a -> BaseDNSMonad b) = DNSLookupUnsafeIOAction $ do
        r <- v
        let (DNSLookupUnsafeIOAction act) = f r
        act
 
-  instance Functor DNSLookup where
-    fmap (f :: u -> v)  (a :: DNSLookup u) = do
+  instance Functor BaseDNSMonad where
+    fmap (f :: u -> v)  (a :: BaseDNSMonad u) = do
       x <- a
       return (f x)
 
@@ -42,7 +47,7 @@ module DNSOps where
 -- At present, it only asks the default resolver, but what I want
 -- eventually is a full DNS lookup with branching and loop-back to happen.
 
-  queryDNS name rrtype = maybeListToList <$> (DNSLookupUnsafeIOAction $ withResolver defaultrs $ \resolver -> DNS.lookup resolver name rrtype)
+  queryDNS name rrtype = lift (maybeListToList <$> (DNSLookupUnsafeIOAction $ withResolver defaultrs $ \resolver -> DNS.lookup resolver name rrtype))
 
   -- this returns a single RR from the queried RRset
   -- at the moment, it will fail with a pattern match failure when the
@@ -58,7 +63,7 @@ module DNSOps where
 -- they are lower level than queryDNS - they are directed at a
 -- specific server and won't go off chasing referals.
 
-  queryServerRaw nsip name rrtype = DNSLookupUnsafeIOAction $ do
+  queryServerRaw nsip name rrtype = lift $ DNSLookupUnsafeIOAction $ do
     let phn = RCHostName (show nsip)
     res <- makeResolvSeed (ResolvConf phn 3000000 512)
     withResolver res $ \resolver -> DNS.lookupRaw resolver name rrtype
@@ -72,10 +77,12 @@ module DNSOps where
       Nothing -> return Nothing
       Just (DNSFormat _ _ answers _ _) -> return $ Just $ map (\(ResourceRecord _ _ _ _ r) -> r) answers
 
-  debugline s = DNSLookupUnsafeIOAction $ hPutStrLn stderr s
+  debugline s = lift $ DNSLookupUnsafeIOAction $ hPutStrLn stderr s
 
-  runLookup :: DNSLookup a -> IO a
-  runLookup (DNSLookupUnsafeIOAction action) = action
+  runLookup b = runBaseLookup (runListT b)
+
+  runBaseLookup :: BaseDNSMonad a -> IO a
+  runBaseLookup (DNSLookupUnsafeIOAction action) = action
 
   maybeListToList :: Maybe [a] -> [a]
   maybeListToList (Nothing) = []
