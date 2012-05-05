@@ -26,7 +26,7 @@ reportWarning w = reportNagios (NagiosReport "NS" NagiosWarning w)
 
 main = do
   putStrLn "dnsloops - Copyright 2012 CQX Limited - Distribution restricted."
-  (domain :: String) <- head <$> (getArgs :: IO [String])
+  domain <- head <$> getArgs
   sortedAllNS <- runLookup (go domain)
 
   putStrLn $ "sortedAllNS = "++(show sortedAllNS)
