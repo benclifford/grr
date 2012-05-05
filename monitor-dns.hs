@@ -25,7 +25,7 @@ reportSuccess w = reportNagios (NagiosReport "NS" NagiosOK w)
 reportWarning w = reportNagios (NagiosReport "NS" NagiosWarning w)
 
 main = do
-  putStrLn "monitor-dns"
+  putStrLn "dnsloops - Copyright 2012 CQX Limited - Distribution restricted."
   (domain :: String) <- head <$> (getArgs :: IO [String])
   sortedAllNS <- runLookup (go domain)
 
