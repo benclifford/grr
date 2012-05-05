@@ -55,7 +55,14 @@ module DNSOps where
   -- list-monad-like behaviour.
   queryDNSForSingleRR name rrtype = do
     r <- queryDNS name rrtype
-    return $ head r
+    debugline $ "Going all non-deterministic for " ++ (show name)
+
+    -- below non-determinism magic comes from:
+    -- http://stackoverflow.com/questions/6397672/how-to-get-backtracking-and-io-using-listt
+    ndr <- ListT (return r)
+
+    return ndr
+
 
 -- these two mean to query only a specific DNS server for a value.
 -- whatever they do with the output, they need to perform appropriate
