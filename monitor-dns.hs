@@ -97,7 +97,7 @@ go domain = do
 
   nsFromAllNS <- forM hereNS $ \ns -> do
     debugline $ "Checking parent-supplied name server "++(show ns)
-    (RD_A a) <- queryDNSForSingleRR (fromString $ show ns) A
+    a <- queryDNSForAddress (fromString $ show ns)
     -- ^^ ICK - don't go via String
     debugline $ "a parent NS A record is " ++(show a)
     res <- queryServer a (fromString domain) NS
