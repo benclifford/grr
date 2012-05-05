@@ -30,6 +30,11 @@ main = do
   sortedAllNS <- runLookup (go domain)
 
   putStrLn $ "sortedAllNS = "++(show sortedAllNS)
+
+{- This bit is going to probably not work in the presence of ListT-style
+   nondeterminism. Maybe I can patch it up later, if I can figure out what
+   kind of question I'm really asking...
+
   -- now are they all the same?
   let compared = testAllEqual sortedAllNS
 
@@ -38,7 +43,7 @@ main = do
     reportSuccess "all NS RRsets match"
    else do
     reportWarning "NS RRsets are not all the same"
-
+-}
 
 go :: String -> DNSLookup [[String]]
 go domain = do
