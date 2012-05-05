@@ -95,3 +95,14 @@ module DNSOps where
   maybeListToList (Nothing) = []
   maybeListToList (Just l) = l
 
+
+-- the abstraction for IPv4 and v6 address queries
+  queryDNSForAddress name = do
+-- warning for if/when queryDNS becomes non-deterministic
+-- the v6 query shouldn't need to happen repeatedly for every v4 result...
+-- I want these to be parallel (so something to do with mplus?)
+    v4 <- queryDNS name A
+    v6 <- queryDNS name AAAA
+    ndr <- ListT (return $ v4 ++ v6)
+    return ndr
+

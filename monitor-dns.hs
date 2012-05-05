@@ -53,14 +53,14 @@ go domain = do
 
   debugline $ "Nameserver we will use: "++(BSChar.unpack aParentNS)
 
-  (RD_A a) <- queryDNSForSingleRR aParentNS A
+  address <- queryDNSForAddress aParentNS
 
   -- note, this will look up the IP(s) of parent NS outside of my controlled
   -- environment - perhaps later I should be doing the resolution of this
   -- to an IP address myself?
-  debugline $ "a parent NS A record is " ++(show a)
+  debugline $ "a parent NS A record is " ++(show address)
 
-  maybeHereNSresult <- queryServerRaw a (fromString domain) NS
+  maybeHereNSresult <- queryServerRaw address (fromString domain) NS
 
   debugline $ "maybeHereNSresult = " ++ (show maybeHereNSresult)
   let (Just (DNSFormat h q ans auth add)) = maybeHereNSresult
