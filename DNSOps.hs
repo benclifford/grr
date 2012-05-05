@@ -102,7 +102,8 @@ module DNSOps where
 -- the v6 query shouldn't need to happen repeatedly for every v4 result...
 -- I want these to be parallel (so something to do with mplus?)
     v4 <- queryDNS name A
-    v6 <- queryDNS name AAAA
+--    v6 <- queryDNS name AAAA
+    let v6 = []  -- disable IPv6 because I'm not doing error handling right and I get lots of errors on ipv6 that I don't know how I want to handle...
     ndr <- ListT (return $ v4 ++ v6)
     return ndr
 
