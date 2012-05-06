@@ -1,5 +1,6 @@
 -- (c) copyright 2012 cqx limited - distribution limited
 
+
 module QFS where
   -- QFS = Query/Feedback/Storage - lack better name for now...
 
@@ -43,15 +44,11 @@ module QFS where
   -- | Pushes a result for a particular query into the structure, whether
   --   that query has been "launched" or not (whatever that means).
   pushResult :: (Eq resType, Eq qType) => QFSState qType resType -> (qType, resType) -> QFSState qType resType
-  pushResult (QFSState entries) (q,r) = let
+  pushResult i@(QFSState entries) (q,r) = let
     -- TODO: replace below with partition
     allExceptQ = filter (\(qe,_) -> qe /= q)  entries
     onlyQ = filter (\(qe,_) -> qe == q) entries
-    -- onlyQ should have 0 or 1 entries. assert? or use code that merges all
-    --   found results into one so we don't lose anything even in case of that
-    --   incorrect structure.
-    qWithNew = if onlyQ == [] then [(q, [r])]
-                              else [(q, (snd $ head onlyQ) ++ [r] )]
-   in QFSState (allExceptQ ++ qWithNew)
+    resultsList = concat $ map snd onlyQ
+   in if r `elem` resultsList then i else QFSState (allExceptQ ++ [(q, resultsList ++ [r])])
 
 
