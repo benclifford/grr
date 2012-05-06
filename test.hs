@@ -11,9 +11,11 @@ main = do
   putStrLn $ statsForQFS v2
   v3 <- pushResult v2 (16, -4)
   putStrLn $ statsForQFS v3
-  v4 <- pushResult v3 (2, -1.41)
+  v3a <- pushCallback v3 16 print
+  putStrLn $ statsForQFS v3a
+  v4 <- pushResult v3a (2, -1.41)
   putStrLn $ statsForQFS v4
-  v5 <- pushResult v4 (16, -4)
+  v5 <- pushResult v4 (16, 4)
   putStrLn $ statsForQFS v5
   putStrLn "done"
 

@@ -57,10 +57,21 @@ module QFS where
     let resultsList = concat $ map (\(_,a,_)->a) onlyQ
     let callbacksList = concat $ map (\(_,_,a)->a) onlyQ
     let res = if r `elem` resultsList then i else QFSState (allExceptQ ++ [(q, resultsList ++ [r], callbacksList)])
+    -- TODO invoke existing callbacks on new result
     return res
 
   -- | pushes a callback to be invoked when a particular query result
   --   is pushed, and if there are any existing results for that query, then
   --   invokes the callback immediately for each of them.
-  -- pushCallback :: QFSState qType resType m -> (resType -> m ()) -> m ()
+  -- pushCallback :: (Monad m) => QFSState qType resType m -> qType -> (resType -> m ()) -> m (QFSState qType resType m)
+  pushCallback :: (Eq resType, Eq qType, Monad m) => QFSState qType resType m -> qType -> (resType -> m()) -> m (QFSState qType resType m)
+  pushCallback i@(QFSState entries) q callback = do
+    -- TODO: replace below with partition
+    let allExceptQ = filter (\(qe,_,_) -> qe /= q)  entries
+    let onlyQ = filter (\(qe,_,_) -> qe == q) entries
+    let resultsList = concat $ map (\(_,a,_)->a) onlyQ
+    let callbacksList = concat $ map (\(_,_,a)->a) onlyQ
+    let res = QFSState (allExceptQ ++ [(q, resultsList, callbacksList ++ [callback])])
+    mapM_ callback resultsList -- callback on existing results.
+    return res
 
