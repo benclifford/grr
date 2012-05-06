@@ -1,8 +1,11 @@
 -- (c) copyright 2012 cqx limited - distribution limited
 
+{-# LANGUAGE ScopedTypeVariables, DatatypeContexts #-}
 
 module QFS where
   import Data.List
+  import Control.Monad.Trans
+
   -- QFS = Query/Feedback/Storage - lack better name for now...
 
   -- I think I want to end up with a monad transformer where there
@@ -71,4 +74,29 @@ module QFS where
     let res = QFSState (allExceptQ ++ [(q, resultsList, callbacksList ++ [callback])])
     mapM_ callback resultsList -- callback on existing results.
     return res
+
+  -- ok, what should this monad look like? (if it is even a monad...)
+  -- its "sequence/state-like"
+  -- we can at least lift an operation into the monad from the
+  --    underlying monad.
+
+  data Monad m => QFST m a = QFST { runQFST :: m a }
+
+  instance Monad m => Monad (QFST m) where
+    return a = QFST (return a)
+    (l :: QFST m t) >>= (k :: t -> QFST m v) =
+      QFST $ do -- in the inner monad
+                a <- runQFST l
+                b <- runQFST (k a)
+                return b
+
+  -- QFS stateful transformer around monad m
+{-
+  instance Monad m => Monad (QFST m) where
+    ((QLift op) :: QFST m a) >>= (f :: a -> QFST m b) = op >>= f
+    return a = QLift (return a)
+
+  instance MonadTrans QFST where
+    lift op = QLift op
+-}
 
