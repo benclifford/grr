@@ -57,7 +57,7 @@ module QFS where
     let resultsList = concat $ map (\(_,a,_)->a) onlyQ
     let callbacksList = concat $ map (\(_,_,a)->a) onlyQ
     let res = if r `elem` resultsList then i else QFSState (allExceptQ ++ [(q, resultsList ++ [r], callbacksList)])
-    -- TODO invoke existing callbacks on new result
+    mapM_ (\callback -> callback r) callbacksList
     return res
 
   -- | pushes a callback to be invoked when a particular query result
