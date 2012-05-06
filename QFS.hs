@@ -32,16 +32,17 @@ module QFS where
   -- perhaps I need to provide an initial callback for "making the offical
   -- query", at construction time?
 
-  -- | Describes the state of a QFS store at any particular instant in time.
-  --   This is immutable. There will be operations which take a QFSState and
+  -- | This is immutable. There will be operations which take a QFSState and
   --   yield a new QFSState; those operations will also have to invoke the
   --   callbacks as necessary, I think.
 
-  -- statsForQFS :: (Eq resType, Eq qType) => QFSState qType resType
+  data (Eq qType, Eq resType, Monad m) => QFSState qType resType m = QFSState [(qType, [resType], [resType -> m()])]
+
+  -- | Describes the state of a QFS store at any particular instant in time.
+
   statsForQFS :: (Show resType, Show qType, Eq resType,  Eq qType, Monad m) => QFSState qType resType m -> String
   statsForQFS (QFSState l) = "QFS: "++(show (map (\(q, rl, cb) -> show (q, rl, length cb)) l))
 
-  data (Eq qType, Eq resType, Monad m) => QFSState qType resType m = QFSState [(qType, [resType], [resType -> m()])]
 
   emptyQFS :: (Eq resType, Eq qType, Monad m) => QFSState qType resType m
   emptyQFS = QFSState []
@@ -62,7 +63,6 @@ module QFS where
   -- | pushes a callback to be invoked when a particular query result
   --   is pushed, and if there are any existing results for that query, then
   --   invokes the callback immediately for each of them.
-  -- pushCallback :: (Monad m) => QFSState qType resType m -> qType -> (resType -> m ()) -> m (QFSState qType resType m)
   pushCallback :: (Eq resType, Eq qType, Monad m) => QFSState qType resType m -> qType -> (resType -> m()) -> m (QFSState qType resType m)
   pushCallback i@(QFSState entries) q callback = do
     let (onlyQ, allExceptQ) = partition (\(qe,_,_) -> qe == q) entries
