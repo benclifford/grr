@@ -30,6 +30,7 @@ main = do
   sortedAllNS <- runLookup (go domain)
 
   putStrLn $ "sortedAllNS = "++(show sortedAllNS)
+  putStrLn $ "number of NS RRsets: "++(show $ length sortedAllNS)
 
   -- flatten away the non-determinism
   let alltogether = concat sortedAllNS
