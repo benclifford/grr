@@ -2,6 +2,7 @@
 
 
 module QFS where
+  import Data.List
   -- QFS = Query/Feedback/Storage - lack better name for now...
 
   -- I think I want to end up with a monad transformer where there
@@ -51,9 +52,7 @@ module QFS where
 
   pushResult :: (Eq resType, Eq qType, Monad m) => QFSState qType resType m -> (qType, resType) -> m (QFSState qType resType m)
   pushResult i@(QFSState entries) (q,r) = do
-    -- TODO: replace below with partition
-    let allExceptQ = filter (\(qe,_,_) -> qe /= q)  entries
-    let onlyQ = filter (\(qe,_,_) -> qe == q) entries
+    let (onlyQ, allExceptQ) = partition (\(qe,_,_) -> qe == q) entries
     let resultsList = concat $ map (\(_,a,_)->a) onlyQ
     let callbacksList = concat $ map (\(_,_,a)->a) onlyQ
     let res = if r `elem` resultsList then i else QFSState (allExceptQ ++ [(q, resultsList ++ [r], callbacksList)])
@@ -66,9 +65,7 @@ module QFS where
   -- pushCallback :: (Monad m) => QFSState qType resType m -> qType -> (resType -> m ()) -> m (QFSState qType resType m)
   pushCallback :: (Eq resType, Eq qType, Monad m) => QFSState qType resType m -> qType -> (resType -> m()) -> m (QFSState qType resType m)
   pushCallback i@(QFSState entries) q callback = do
-    -- TODO: replace below with partition
-    let allExceptQ = filter (\(qe,_,_) -> qe /= q)  entries
-    let onlyQ = filter (\(qe,_,_) -> qe == q) entries
+    let (onlyQ, allExceptQ) = partition (\(qe,_,_) -> qe == q) entries
     let resultsList = concat $ map (\(_,a,_)->a) onlyQ
     let callbacksList = concat $ map (\(_,_,a)->a) onlyQ
     let res = QFSState (allExceptQ ++ [(q, resultsList, callbacksList ++ [callback])])
