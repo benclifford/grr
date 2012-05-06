@@ -10,6 +10,7 @@ module DNSOps where
   import qualified Network.DNS as DNS
   import Network.DNS hiding (lookup)
   import System.IO
+  import System.IO.Error
   import System.IO.Unsafe
 
   defaultrs = unsafePerformIO $ makeResolvSeed defaultResolvConf
@@ -47,7 +48,7 @@ module DNSOps where
 -- At present, it only asks the default resolver, but what I want
 -- eventually is a full DNS lookup with branching and loop-back to happen.
 
-  queryDNS name rrtype = lift (maybeListToList <$> (DNSLookupUnsafeIOAction $ withResolver defaultrs $ \resolver -> DNS.lookup resolver name rrtype))
+  queryDNS name rrtype = lift (maybeListToList <$> (DNSLookupUnsafeIOAction $ maybeIO $ withResolver defaultrs $ \resolver -> DNS.lookup resolver name rrtype))
 
   -- this returns a single RR from the queried RRset
   -- at the moment, it will fail with a pattern match failure when the
@@ -73,7 +74,7 @@ module DNSOps where
   queryServerRaw nsip name rrtype = lift $ DNSLookupUnsafeIOAction $ do
     let phn = RCHostName (show nsip)
     res <- makeResolvSeed (ResolvConf phn 3000000 512)
-    withResolver res $ \resolver -> DNS.lookupRaw resolver name rrtype
+    maybeIO $ withResolver res $ \resolver -> DNS.lookupRaw resolver name rrtype
 
 
   -- for monadic niceness, is there a way to rephrase this case as something
@@ -95,6 +96,13 @@ module DNSOps where
   maybeListToList (Nothing) = []
   maybeListToList (Just l) = l
 
+  -- | runs an IO operation which returns a Maybe, and if it
+  --   fails, return a Nothing; otherwise return whatever the
+  --   IO operation returned (which might itself be a maybe)
+  --   The error is printed to stdout (though maybe should go to
+  --   some other debug channel)
+  maybeIO :: IO (Maybe t) -> IO (Maybe t)
+  maybeIO op = catchIOError op (\e -> print e >> return Nothing)
 
 -- the abstraction for IPv4 and v6 address queries
   queryDNSForAddress name = do
@@ -102,8 +110,8 @@ module DNSOps where
 -- the v6 query shouldn't need to happen repeatedly for every v4 result...
 -- I want these to be parallel (so something to do with mplus?)
     v4 <- queryDNS name A
---    v6 <- queryDNS name AAAA
-    let v6 = []  -- disable IPv6 because I'm not doing error handling right and I get lots of errors on ipv6 that I don't know how I want to handle...
+    v6 <- queryDNS name AAAA
+--    let v6 = []  -- disable IPv6 because I'm not doing error handling right and I get lots of errors on ipv6 that I don't know how I want to handle...
     ndr <- ListT (return $ v4 ++ v6)
     return ndr
 
