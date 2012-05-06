@@ -10,3 +10,7 @@ Executable dnsloops
   Build-depends: base, dns, bytestring, nagios-haskell, mtl
   main-is: monitor-dns.hs
 
+Executable test-dnsloops
+  Build-depends: base, dns, bytestring, nagios-haskell, mtl
+  main-is: test.hs
+
