@@ -26,6 +26,13 @@ module DNSOps where
 --  ii) caching with state - StateT?
 -- iii) loopback of cache updates - this is a bit novel
 
+-- At the moment, whenever a query to a server returns nothing/Nothing,
+-- I'm giving it uniform treatment. But I should perhaps distinguish between
+-- the various protocol-level nothings being returns - is it that the server
+-- is broken (in which case the protocol would skip onto next server) or is
+-- it that these are real 'empty' results which should remain like that in
+-- the cache?
+
   type DNSLookup a = ListT BaseDNSMonad a
 
   data BaseDNSMonad a = DNSLookupUnsafeIOAction (IO a)
