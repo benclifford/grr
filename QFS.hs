@@ -36,19 +36,31 @@ module QFS where
   --   yield a new QFSState; those operations will also have to invoke the
   --   callbacks as necessary, I think.
 
-  data (Eq qType, Eq resType) => QFSState qType resType = QFSState [(qType, [resType])] deriving Show
+  -- statsForQFS :: (Eq resType, Eq qType) => QFSState qType resType
+  statsForQFS :: (Show resType, Show qType, Eq resType,  Eq qType, Monad m) => QFSState qType resType m -> String
+  statsForQFS (QFSState l) = "QFS: "++(show (map (\(q, rl, cb) -> show (q, rl, length cb)) l))
 
-  emptyQFS :: (Eq resType, Eq qType) => QFSState qType resType
+  data (Eq qType, Eq resType, Monad m) => QFSState qType resType m = QFSState [(qType, [resType], [resType -> m()])]
+
+  emptyQFS :: (Eq resType, Eq qType, Monad m) => QFSState qType resType m
   emptyQFS = QFSState []
 
   -- | Pushes a result for a particular query into the structure, whether
   --   that query has been "launched" or not (whatever that means).
-  pushResult :: (Eq resType, Eq qType) => QFSState qType resType -> (qType, resType) -> QFSState qType resType
-  pushResult i@(QFSState entries) (q,r) = let
-    -- TODO: replace below with partition
-    allExceptQ = filter (\(qe,_) -> qe /= q)  entries
-    onlyQ = filter (\(qe,_) -> qe == q) entries
-    resultsList = concat $ map snd onlyQ
-   in if r `elem` resultsList then i else QFSState (allExceptQ ++ [(q, resultsList ++ [r])])
+  --   It will need to invoke any registered callbacks for this query.
 
+  pushResult :: (Eq resType, Eq qType, Monad m) => QFSState qType resType m -> (qType, resType) -> m (QFSState qType resType m)
+  pushResult i@(QFSState entries) (q,r) = do
+    -- TODO: replace below with partition
+    let allExceptQ = filter (\(qe,_,_) -> qe /= q)  entries
+    let onlyQ = filter (\(qe,_,_) -> qe == q) entries
+    let resultsList = concat $ map (\(_,a,_)->a) onlyQ
+    let callbacksList = concat $ map (\(_,_,a)->a) onlyQ
+    let res = if r `elem` resultsList then i else QFSState (allExceptQ ++ [(q, resultsList ++ [r], callbacksList)])
+    return res
+
+  -- | pushes a callback to be invoked when a particular query result
+  --   is pushed, and if there are any existing results for that query, then
+  --   invokes the callback immediately for each of them.
+  -- pushCallback :: QFSState qType resType m -> (resType -> m ()) -> m ()
 
