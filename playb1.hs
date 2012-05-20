@@ -7,10 +7,14 @@ import Data.IORef -- replace with statet
 -- this should become a state monad transformer layer between
 -- ContT and IO, I think:
 
-type Callback = Integer -> ContT [Integer] IO [Integer]
+type StoreValue = Integer
+type ReturnValue = String
+
+
+type Callback = StoreValue -> ContT [ReturnValue] IO [ReturnValue]
 
 callback = unsafePerformIO $ newIORef ([] :: [Callback])
-alreadyPushed = unsafePerformIO $ newIORef ([] :: [Integer])
+alreadyPushed = unsafePerformIO $ newIORef ([] :: [StoreValue])
 
 {-
 maybe implement using fixed Query Response types to reduce quantification
@@ -58,8 +62,8 @@ main = do
   putStrLn $ "alreadyPushed state has " ++ (show $ length t) ++ " entries."
 
 data DM a where
-   Push :: Integer -> DM ()
-   Pull :: DM Integer
+   Push :: StoreValue -> DM ()
+   Pull :: DM StoreValue
    Lift :: IO a -> DM a
    Return :: a -> DM a
    Bind :: DM a -> (a -> DM b) -> DM b
@@ -71,16 +75,16 @@ instance Monad DM where
 
 -- progrReturn is called 'abort' in some literature
 
-ointerpret :: DM Integer -> ContT [Integer] IO [Integer]
+ointerpret :: DM ReturnValue -> ContT [ReturnValue] IO [ReturnValue]
 ointerpret prog = do
   l <- callCC $ \progReturn -> do
-    x <- interpret progReturn (prog :: DM Integer)
+    x <- interpret progReturn (prog :: DM ReturnValue)
     return [x]
   return l
 
 -- ^^^ progReturn needs to take a [Integer], but x<- is binding an Integer.
 
-interpret :: ([Integer] -> ContT [Integer] IO [Integer]) -> DM a -> ContT [Integer] IO a
+interpret :: ([ReturnValue] -> ContT [ReturnValue] IO [ReturnValue]) -> DM a -> ContT [ReturnValue] IO a
 
 interpret progReturn Pull = callCC $ \k -> do
   lift $ putStrLn $ "pull"
@@ -103,8 +107,8 @@ interpret progReturn (Push v) = callCC $ \k -> do
 -- provenance annotation here.
     (callbacks :: [Callback]) <- lift $ readIORef callback
     lift $ modifyIORef alreadyPushed (\l -> l ++ [v])
-    (rl :: [[Integer]]) <- lift $ mapM (\(cb :: Callback) -> putStrLn "calling cb" >> runContT (cb v) return) (callbacks :: [Callback])
-    (r :: [Integer]) <- lift $ runContT (k ()) id
+    (rl :: [[ReturnValue]]) <- lift $ mapM (\(cb :: Callback) -> putStrLn "calling cb" >> runContT (cb v) return) (callbacks :: [Callback])
+    (r :: [ReturnValue]) <- lift $ runContT (k ()) id
     progReturn (r ++ join rl)
     return ()
   return () -- need this to makes type work... even though we should never hit this line
@@ -134,11 +138,11 @@ interpret progReturn (Bind action rest :: DM b) = do
   u <- interpret progReturn (rest v)
   return u
 
-prog :: DM Integer
+prog :: DM ReturnValue
 prog = do
   Push 100
   x <- Pull
   Push 130
-  return (x+1)
+  return $ show (x+1)
 
 
